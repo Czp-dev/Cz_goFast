@@ -1,11 +1,12 @@
 local isUIOpen = false
 local isPlayerReady = false
-local pedSpawn = false
 local countdownTime = 300 
 local remainingTime = 0
 local isCountdownActive = false
 local time = 0
 local reward = 0
+local pedSpawn = false
+local ped
 
 function openUI()
     if not isUIOpen then 
@@ -61,37 +62,38 @@ end
 
 function spawnPed()
     if pedSpawn then return end
+
     local hash = GetHashKey("a_m_o_acult_02")
-        while not HasModelLoaded(hash) do
-            RequestModel(hash)
-            Wait(20)
-        end
-        ped = CreatePed("BigEnos", "a_m_o_acult_02",  414.3156, 343.4885, 102.5045-1, 338.8057, false, true)
-        SetBlockingOfNonTemporaryEvents(ped, true)
-        SetEntityInvincible(ped, true)
-        FreezeEntityPosition(ped, true)
-        pedSpawn = true
+    RequestModel(hash)
+
+    while not HasModelLoaded(hash) do
+        Wait(20)
+    end
+
+    ped = CreatePed(4, hash, 414.3156, 343.4885, 102.5045 - 1, 338.8057, false, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    SetEntityInvincible(ped, true)
+    FreezeEntityPosition(ped, true)
+
+    exports.ox_target:addLocalEntity(ped, {
+        {
+            name = 'ped_interaction',
+            label = 'Ouvrir UI',
+            icon = 'fa-solid fa-user',
+            distance = 4.0, 
+            onSelect = function()
+                openUI()
+            end
+        }
+    })
+
+    SetModelAsNoLongerNeeded(hash)
+
+    pedSpawn = true
 end
 
-Citizen.CreateThread( function ()
-    while true do
-        spawnPed()
-        time = 10000
-        local playerPed = PlayerPedId()
-        local coords = GetEntityCoords(playerPed)
-        local distancePed = #(coords - vector3(414.3156, 343.4885, 102.5045))
-        if distancePed < 100 then
-            time = 200
-            if distancePed < 10 then 
-                time = 0
-                ESX.ShowHelpNotification('Appuyez sur ~INPUT_CONTEXT~ pour intéragir')
-                if IsControlJustReleased(1, 51) then 
-                    openUI()
-                end
-            end
-        end
-        Citizen.Wait(time)
-    end
+Citizen.CreateThread(function()
+    spawnPed()
 end)
 
 RegisterNuiCallback('firstMission', function ()
