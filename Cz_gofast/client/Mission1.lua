@@ -1,12 +1,19 @@
 local isUIOpen = false
 local isPlayerReady = false
+local isPlayerGetMarch = false
+local isPlayerInCar = false
+local isPlayerMission = false
 local countdownTime = 300 
 local remainingTime = 0
 local isCountdownActive = false
 local time = 0
 local reward = 0
 local pedSpawn = false
-local ped
+local isPedSpawn = false
+local finalcoords = nil
+
+
+
 
 function openUI()
     if not isUIOpen then 
@@ -57,7 +64,6 @@ function getCar(carName, x, y, z, heading)
         Citizen.Wait(10)
     end
 
-    TaskWarpPedIntoVehicle(playerPed, car, -1)
 end
 
 function spawnPed()
@@ -92,9 +98,7 @@ function spawnPed()
     pedSpawn = true
 end
 
-Citizen.CreateThread(function()
-    spawnPed()
-end)
+
 
 RegisterNuiCallback('firstMission', function ()
     finalcoords = vector3(2674.1750, 1515.8195, 24.4987)
@@ -107,23 +111,93 @@ RegisterNuiCallback('firstMission', function ()
 end)
 
 RegisterNUICallback('secondMission', function()
-    finalcoords = vector3(414.9604, 2996.5095, 40.5630)
-    SetNewWaypoint(414.9604, 2996.5095)
-    getCar('sultan', 370.2192, 348.9810, 102.9179, 162.1385)
-    isPlayerReady = true
+    finalcoords = vector3(1233.0366, -3229.5491, 5.7562)
+    carCoords = vector3(359.5537, 271.0142, 103.0787)
+    coords = vector3(230.2068, 113.6821, 93.7016)
+    blip = AddBlipForCoord(carCoords.x, carCoords.y, carCoords.z)
+    getCar('sultan', 359.5537, 271.0142, 103.0787, 342.0844)
     remainingTime = countdownTime 
     isCountdownActive = true
     reward = 25000
+    isPlayerReady = true
+    openUI()
+    SetBlipSprite(blip, 9)
+    SetBlipDisplay(blip, 4)
+    SetBlipScale(blip, 0.1)
+    SetBlipColour(blip, 5)
+    BeginTextCommandSetBlipName("STRING")
+    AddTextComponentString("Point temporaire")
+    EndTextCommandSetBlipName(blip)
 end)
 
 RegisterNUICallback('thrirdMission', function()
     finalcoords = vector3(51.9767, 7114.5098, 3.1057)
+    carCoords = vector3(51.9767, 7114.5098, 3.1057)
+
     SetNewWaypoint(51.9767, 7114.5098)
     getCar('sultan', 370.2192, 348.9810, 102.9179, 162.1385)
     isPlayerReady = true
     remainingTime = countdownTime 
     isCountdownActive = true
     reward = 35000
+end)
+
+Citizen.CreateThread( function ()
+    while true do
+        if isPlayerInCar then 
+            blip2 = AddBlipForCoord(coords.x, coords.y, coords.z)
+            RemoveBlip(blip)
+            SetBlipSprite(blip2, 9) -- Icône
+            SetBlipDisplay(blip2, 4)  -- Visible sur la carte
+            SetBlipScale(blip2, 0.1)  -- Taille
+            SetBlipColour(blip2, 5)   -- Couleur verte
+            BeginTextCommandSetBlipName("STRING")
+            AddTextComponentString("Point temporaire")
+            EndTextCommandSetBlipName(blip2)
+        end
+        Citizen.Wait(0)
+    end
+end)
+
+function spawnPed2()
+    if not isPlayerMission then
+        if isPedSpawn then return end
+    
+        local hash = GetHashKey("a_m_o_acult_02")
+        RequestModel(hash)
+    
+        while not HasModelLoaded(hash) do
+            Wait(20)
+        end
+    
+        ped = CreatePed(4, hash, 230.2068, 113.6821, 93.7016 - 1, 183.8655, false, true)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        SetEntityInvincible(ped, true)
+        FreezeEntityPosition(ped, true)
+    
+        exports.ox_target:addLocalEntity(ped, {
+            {
+                name = 'ped_interaction',
+                label = 'Prendre La Marchandise',
+                icon = 'fa-solid fa-user',
+                distance = 4.0, 
+                onSelect = function()
+                    
+                    isPlayerGetMarch = true
+                end
+            }
+        })
+    
+        SetModelAsNoLongerNeeded(hash)
+    
+        isPedSpawn = true
+    end
+end
+
+
+Citizen.CreateThread(function()
+    spawnPed()
+    spawnPed2()
 end)
 
 Citizen.CreateThread(function()
@@ -142,7 +216,7 @@ end)
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        if isPlayerReady then
+        if isPlayerMission then
             if isCountdownActive then
                 local minutes = math.floor(remainingTime / 60)
                 local seconds = remainingTime % 60
@@ -156,7 +230,7 @@ Citizen.CreateThread(function()
     while true do
         Citizen.Wait(1000) 
 
-        if isPlayerReady then
+        if isPlayerMission then
             local playerPed = PlayerPedId()
             local vehicle = GetVehiclePedIsIn(playerPed, false)
 
@@ -165,6 +239,7 @@ Citizen.CreateThread(function()
                 ESX.ShowNotification("⏳ Vous avez quitté le véhicule ! Mission échouée.")
                 isPlayerReady = false  
                 isCountdownActive = false
+                isPlayerMission = false
 
                 if DoesEntityExist(vehicle) then
                     ESX.Game.DeleteVehicle(vehicle)
@@ -174,11 +249,27 @@ Citizen.CreateThread(function()
     end
 end)
 
+
+
 Citizen.CreateThread(function ()
     while true do
         Citizen.Wait(time)
        
-        if isPlayerReady then
+        if isPlayerGetMarch then
+            isPlayerInCar = false
+            blip3 = AddBlipForCoord(finalcoords.x, finalcoords.y, finalcoords.z)
+            RemoveBlip(blip2)
+            if blip3 then
+                SetBlipSprite(blip3, 9)     
+                SetBlipDisplay(blip3, 4) 
+                SetBlipScale(blip3, 0.1)    
+                SetBlipColour(blip3, 5)
+                BeginTextCommandSetBlipName("STRING")
+                AddTextComponentString("Point temporaire")
+                EndTextCommandSetBlipName(blip3)
+            else
+                print("Erreur lors de la création du blip")
+            end
             time = 0
             local playerPed = PlayerPedId()
             local coords = GetEntityCoords(playerPed)
@@ -193,7 +284,32 @@ Citizen.CreateThread(function ()
                     TriggerServerEvent('gofast:reward', reward)
                     ESX.ShowNotification("Bien joué ! Vous venez de gagner ".. reward .." $")
                     isPlayerReady = false
+                    isPlayerGetMarch = false
+                    isPlayerInCar = false
+                    isPlayerMission = false
                     isCountdownActive = false
+                end
+            end
+        end
+    end
+end)
+
+
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(time)    
+        if isPlayerReady then
+            time = 0
+            local playerPed = PlayerPedId()
+            local coords = GetEntityCoords(playerPed)
+            local distance1 = #(coords - vector3(carCoords.x, carCoords.y, carCoords.z))
+            local vehicle = GetVehiclePedIsIn(playerPed, true)
+            if distance1 < 1 then
+               isPlayerReady = false
+               isPlayerInCar = true
+                if not vehicle then
+                    print('ok')
+                    isPlayerMission = true
                 end
             end
         end
